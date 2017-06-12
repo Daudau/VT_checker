@@ -11,10 +11,11 @@ from optparse import OptionParser
 VERSION = '0.1'
 
 
-def submit_resource(resource_type, uri, resource_file, api_key):
+def submit_resource(resource_type, uri, resource_file, api_key, output):
   if not os.path.isfile(resource_file):
     print("\033[91m[ERROR]\033[0m Given file does not exist: " + resource_file)
     sys.exit(-1)
+  f = open(output, "w")
   with open(resource_file) as resource:
     for re in resource:
       params = {'apikey': api_key, 
@@ -42,13 +43,20 @@ def submit_resource(resource_type, uri, resource_file, api_key):
               print("\tDetection ratio: \033[91m" + 
                 str(json_response['positives']) + "/" + 
                 str(json_response['total']) + "\033[0m\n")
+            f.write(resource_type + "," + str(json_response['response_code']) + 
+              "," + json_response['scan_date'] + "," +
+              str(json_response['positives']) +
+              ',' + str(json_response['total']) + "\n") 
           else :
             print("\033[94m[" + resource_type + "]\033[0m " +
               re.replace('\n', '') + ":")
             print("\t" + json_response['verbose_msg'] + "\n")
+            f.write(resource_type + "," + str(json_response['response_code']) + 
+              "," + json_response['verbose_msg'] + "\n") 
         except:
           print("\033[93m[WARNING]\033[0m Got invalid response format for " +
             "resource: " + re)
+  f.close()
 
 
 def main(argv=None):
@@ -65,6 +73,8 @@ def main(argv=None):
     help="File containing the hashes to submit.")
   parser.add_option("-f", "--folder", dest="folder", default=None,
     help="Folder containing the files to submit (by MD5).")
+  parser.add_option("-o", "--output", dest="output", default="output.csv",
+    help="Filename for the CSV output.")
   (options, args) = parser.parse_args()
 
   if not options.api_key:
@@ -75,22 +85,26 @@ def main(argv=None):
     sys.exit(-1)
 
   if options.urls:
-    submit_resource("URL", "/url/report", options.urls, options.api_key)
+    submit_resource("URL", "/url/report", options.urls, options.api_key,
+      options.output)
                 
   if options.domains:
     submit_resource("DOMAIN", "/domain/report", options.domains, 
-      options.api_key)
+      options.api_key, options.output)
 
   if options.ips:
-    submit_resource("IP", "/ip-address/report", options.ips, options.api_key)
+    submit_resource("IP", "/ip-address/report", options.ips, options.api_key,
+      options.output)
 
   if options.hashes:
-    submit_resource("HASH", "/file/report", options.hashes, options.api_key)
+    submit_resource("HASH", "/file/report", options.hashes, options.api_key,
+      options.output)
 
   if options.folder:
     if not os.path.isdir(options.folder):
       print("\033[91m[ERROR]\033[0m Given folder does not exist.")
       sys.exit(-1)
+    f = open(options.output, "w")
     for root, directories, filenames in os.walk(options.folder):
       for filename in filenames: 
         md5 =  hashlib.md5(open(os.path.join(root,filename), 
@@ -120,13 +134,20 @@ def main(argv=None):
                 print("\tDetection ratio: \033[91m" + 
                   str(json_response['positives']) + "/" + 
                   str(json_response['total']) + "\033[0m\n")
+              f.write("FILE," + str(json_response['response_code']) + 
+                "," + json_response['scan_date'] + "," +
+                str(json_response['positives']) +
+                ',' + str(json_response['total']) + "\n") 
             else :
               print("\033[94m[FILE]\033[0m " + os.path.join(root,filename) + 
                 "(" + md5 + "):")
               print("\t" + json_response['verbose_msg'] + "\n")
+              f.write("FILE," + str(json_response['response_code']) + 
+                "," + json_response['verbose_msg'] + "\n") 
           except:
             print("\033[93m[WARNING]\033[0m Got invalid response format for " +
               "resource: " + os.path.join(root,filename))
+    f.close()
 
 if __name__ == '__main__':
   main()
